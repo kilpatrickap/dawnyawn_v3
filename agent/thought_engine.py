@@ -1,4 +1,4 @@
-# dawnyawn/agent/thought_engine.py (Final Version with Simplified Plan Update)
+# dawnyawn/agent/thought_engine.py (Final Version with Enhanced Logging)
 import re
 import json
 import logging
@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from pydantic_core import ValidationError
 from config import get_llm_client, LLM_MODEL_NAME, LLM_REQUEST_TIMEOUT
 from tools.tool_manager import ToolManager
-from models.task_node import TaskNode
+from models.task_node import TaskNode, TaskStatus
 from typing import List, Dict
 
 
@@ -15,7 +15,6 @@ class ToolSelection(BaseModel):
     tool_input: str
 
 
-# NEW: A Pydantic model for the simplified plan update response
 class PlanUpdate(BaseModel):
     completed_task_ids: List[int]
 
@@ -34,7 +33,6 @@ class ThoughtEngine:
     def __init__(self, tool_manager: ToolManager):
         self.client = get_llm_client()
         self.tool_manager = tool_manager
-        # This system prompt for choosing actions is now very solid.
         self.system_prompt_template = f"""
 You are an expert penetration tester and command-line AI. Your SOLE function is to output a single, valid JSON object that represents the next best command to execute.
 
@@ -59,15 +57,49 @@ III. AVAILABLE TOOLS:
         if not plan: return "No plan provided."
         return "\n".join([f"  - Task {task.task_id} [{task.status}]: {task.description}" for task in plan])
 
+    # --- NEW METHOD: For clear, user-facing status updates ---
+    def _log_plan_status(self, plan: List[TaskNode]):
+        """Logs the current status of all tasks for user visibility."""
+        logging.info("--- Current Mission Status ---")
+        if not plan:
+            logging.info("  No plan has been generated yet.")
+        else:
+            for task in plan:
+                if task.status == TaskStatus.COMPLETED:
+                    icon = "✅"
+                elif task.status == TaskStatus.FAILED:
+                    icon = "❌"
+                else: # PENDING or RUNNING
+                    icon = "📝"
+                logging.info(f"  {icon} Task {task.task_id} [{task.status}]: {task.description}")
+        logging.info("------------------------------")
+
+
     def choose_next_action(self, goal: str, plan: List[TaskNode], history: List[Dict]) -> ToolSelection:
         logging.info("🤔 Thinking about the next step...")
 
-        user_prompt = (
-            f"Based on the goal, plan, and history below, decide the single best command to execute next to progress on a PENDING task. Respond with a single, valid JSON object.\n\n"
-            f"**Main Goal:** {goal}\n\n"
-            f"**Strategic Plan:**\n{self._format_plan(plan)}\n\n"
-            f"**Execution History (most recent last):\n{json.dumps(history, indent=2)}"
-        )
+        # --- ADD THIS LINE: Call the new logging method ---
+        self._log_plan_status(plan)
+
+        all_tasks_completed = all(task.status == TaskStatus.COMPLETED for task in plan)
+
+        if all_tasks_completed and plan:
+            logging.info("✅ All plan tasks are complete. Forcing finish_mission.")
+            user_prompt = (
+                "CRITICAL: All tasks in the strategic plan are now marked as 'COMPLETED'.\n"
+                "You MUST now use the `finish_mission` tool.\n"
+                "Review the full execution history and provide a detailed, final summary of your findings as the `tool_input`.\n"
+                "Your response MUST be the required JSON object.\n\n"
+                f"**Main Goal:** {goal}\n\n"
+                f"**Execution History:**\n{json.dumps(history, indent=2)}"
+            )
+        else:
+            user_prompt = (
+                f"Based on the goal, plan, and history below, decide the single best command to execute next to progress on a PENDING task. Respond with a single, valid JSON object.\n\n"
+                f"**Main Goal:** {goal}\n\n"
+                f"**Strategic Plan:**\n{self._format_plan(plan)}\n\n"
+                f"**Execution History (most recent last):\n{json.dumps(history, indent=2)}"
+            )
         try:
             response = self.client.chat.completions.create(
                 model=LLM_MODEL_NAME,
@@ -79,14 +111,18 @@ III. AVAILABLE TOOLS:
             )
             raw_response = response.choices[0].message.content
             selection = ToolSelection.model_validate_json(_clean_json_response(raw_response))
-            logging.info("AI's Next Action: %s", selection.tool_input)
+
+            if all_tasks_completed and plan:
+                logging.info("AI is summarizing the mission to finish.")
+            else:
+                logging.info("AI's Next Action: %s", selection.tool_input)
+
             return selection
         except (ValidationError, json.JSONDecodeError) as e:
             logging.error("Critical Error during thought process: %s", type(e).__name__)
             return ToolSelection(tool_name="finish_mission",
                                  tool_input="Mission failed: The AI produced an invalid JSON response.")
 
-    # --- THE FIX: This method is now much simpler for the AI ---
     def get_completed_task_ids(self, goal: str, plan: List[TaskNode], history: List[Dict]) -> List[int]:
         """Asks the AI to identify which tasks are complete based on the latest action."""
         plan_update_prompt = (
@@ -111,4 +147,4 @@ III. AVAILABLE TOOLS:
             return update.completed_task_ids
         except (ValidationError, json.JSONDecodeError) as e:
             logging.error("AI failed to identify completed tasks with valid JSON: %s", e)
-            return []  # Return an empty list on failure
+            return []
