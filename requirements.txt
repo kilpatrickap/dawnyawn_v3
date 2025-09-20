@@ -1,0 +1,11 @@
+openai
+pydantic
+python-dotenv
+requests
+uvicorn
+fastapi
+kali_driver
+kali-driver
+docker
+paramiko
+pytest
