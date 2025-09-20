@@ -30,7 +30,7 @@ class KaliContainer:
         self._container.reload()
         if self._container.status != "running":
             self._container.start()
-            time.sleep(2)
+            time.sleep(2) # A brief, initial sleep can still be helpful
         self._container.reload()
 
     def _ensure_connected(self):
@@ -49,10 +49,27 @@ class KaliContainer:
 
         self._ssh_client = paramiko.SSHClient()
         self._ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        self._ssh_client.connect(
-            hostname='localhost', port=public_port, username='root',
-            key_filename=key_path, timeout=30
-        )
+
+        # --- THE FIX: Implement a retry loop for the SSH connection ---
+        max_retries = 5
+        retry_delay = 2  # in seconds
+        for attempt in range(max_retries):
+            try:
+                self._ssh_client.connect(
+                    hostname='localhost', port=public_port, username='root',
+                    key_filename=key_path, timeout=10 # Use a shorter timeout for the connection attempt
+                )
+                # If connection is successful, break the loop
+                print(f"  [+] SSH connection established to container '{self.short_id}' on attempt {attempt + 1}.")
+                return
+            except (paramiko.ssh_exception.SSHException, ConnectionResetError, TimeoutError) as e:
+                if attempt < max_retries - 1:
+                    print(f"  [!] SSH connection failed with '{type(e).__name__}'. Retrying in {retry_delay}s...")
+                    time.sleep(retry_delay)
+                else:
+                    print(f"  [!] SSH connection failed after {max_retries} attempts.")
+                    # Re-raise the last exception to let the caller handle the final failure
+                    raise e
 
     # --- THE FIX: This method NO LONGER returns output. It just executes. ---
     def send_command_and_get_output(self, command: str, timeout: int = 1800):
@@ -76,9 +93,17 @@ class KaliContainer:
                     f.write(chunk)
                 f.seek(0)
                 with tarfile.open(fileobj=f) as tar:
-                    member = tar.getmembers()[0]
+                    # Handle cases where the tarball might be empty or malformed
+                    members = tar.getmembers()
+                    if not members:
+                         return f"Command produced no output file at '{path}' (empty archive)."
+                    member = members[0]
                     extracted_file = tar.extractfile(member)
-                    return extracted_file.read().decode('utf-8', errors='ignore')
+                    if extracted_file:
+                        return extracted_file.read().decode('utf-8', errors='ignore')
+                    else:
+                        return f"Failed to extract file from archive for '{path}'."
+
         except docker.errors.NotFound:
             # If the command produced no output file, return a string indicating that.
             return f"Command produced no output file at '{path}'."
