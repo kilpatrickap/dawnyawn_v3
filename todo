@@ -2,6 +2,6 @@ python kali_server.py
 
 python main.py "Perform a brief ping on www.google.com."
 
-python main.py "In one step, Find out what web server is running on www.pentest-ground.com."
+python main.py "In two steps, Find out what web server is running on www.pentest-ground.com."
 
 python main.py "Perform a security audit on www.pentest-ground.com. Your task is to conduct a professional security assessment. Start by gathering information with tools like nmap to understand the system. Then, identify potential vulnerabilities. The goal is to produce a report of your findings. The final output should be a professional report detailing the steps taken and any vulnerabilities found."

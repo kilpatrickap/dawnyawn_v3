@@ -1,4 +1,4 @@
-# dawnyawn/agent/thought_engine.py (Final Version with Enhanced Logging)
+# dawnyawn/agent/thought_engine.py (Final Version with Enhanced Logging and Smart Task Completion)
 import re
 import json
 import logging
@@ -57,7 +57,6 @@ III. AVAILABLE TOOLS:
         if not plan: return "No plan provided."
         return "\n".join([f"  - Task {task.task_id} [{task.status}]: {task.description}" for task in plan])
 
-    # --- NEW METHOD: For clear, user-facing status updates ---
     def _log_plan_status(self, plan: List[TaskNode]):
         """Logs the current status of all tasks for user visibility."""
         logging.info("--- Current Mission Status ---")
@@ -71,14 +70,12 @@ III. AVAILABLE TOOLS:
                     icon = "❌"
                 else: # PENDING or RUNNING
                     icon = "📝"
-                logging.info(f"  {icon} Task {task.task_id} [{task.status}]: {task.description}")
+                logging.info(f"  {icon} Task {task.task_id} [{task.status.value}]: {task.description}")
         logging.info("------------------------------")
 
 
     def choose_next_action(self, goal: str, plan: List[TaskNode], history: List[Dict]) -> ToolSelection:
         logging.info("🤔 Thinking about the next step...")
-
-        # --- ADD THIS LINE: Call the new logging method ---
         self._log_plan_status(plan)
 
         all_tasks_completed = all(task.status == TaskStatus.COMPLETED for task in plan)
@@ -123,13 +120,17 @@ III. AVAILABLE TOOLS:
             return ToolSelection(tool_name="finish_mission",
                                  tool_input="Mission failed: The AI produced an invalid JSON response.")
 
+    # --- THE FIX: This method's prompt is now much smarter about analysis tasks ---
     def get_completed_task_ids(self, goal: str, plan: List[TaskNode], history: List[Dict]) -> List[int]:
         """Asks the AI to identify which tasks are complete based on the latest action."""
         plan_update_prompt = (
-            "You are a project manager AI. Review the strategic plan and the most recent entry in the execution history. "
-            "Identify which task IDs from the plan are now fully completed by the last action's observation. "
+            "You are an expert project manager AI. Your job is to determine which tasks are now complete. "
+            "Review the strategic plan and the observation from the MOST RECENT command.\n\n"
+            "**CRITICAL INSTRUCTION:** The output from one command (like a port scan) might contain all the information needed to complete subsequent 'analysis' tasks. "
+            "For example, if Task 1 is 'Scan the target' and Task 2 is 'Identify the web server', the output of the `nmap` scan for Task 1 likely contains the web server name, completing Task 2 at the same time.\n\n"
+            "Identify ALL task IDs that are now fully completed by the last action's observation. "
             "Your response MUST be a single JSON object with one key: `\"completed_task_ids\"`, which is a list of integers. "
-            "Example: `{\"completed_task_ids\": [1, 3]}`. If no tasks were completed, return an empty list.\n\n"
+            "Example: `{\"completed_task_ids\": [1, 2]}`. If no tasks were completed, return an empty list.\n\n"
             f"**Strategic Plan:**\n{self._format_plan(plan)}\n\n"
             f"**Most Recent Action & Observation:**\n{json.dumps(history[-1], indent=2) if history else 'No actions yet.'}"
         )
@@ -144,7 +145,12 @@ III. AVAILABLE TOOLS:
             )
             raw_response = response.choices[0].message.content
             update = PlanUpdate.model_validate_json(_clean_json_response(raw_response))
+            # Log which tasks the AI has marked as complete
+            if update.completed_task_ids:
+                logging.info("AI assessment: The last action completed Task IDs: %s", update.completed_task_ids)
+            else:
+                logging.info("AI assessment: The last action did not complete any new tasks.")
             return update.completed_task_ids
         except (ValidationError, json.JSONDecodeError) as e:
             logging.error("AI failed to identify completed tasks with valid JSON: %s", e)
-            return []
+            return []  # Return an empty list on failure
