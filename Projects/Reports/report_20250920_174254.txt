@@ -1,0 +1,67 @@
+--- DAWNYAWN MISSION REPORT ---
+===================================
+
+Mission Goal: In two steps, Find out what web server is running on www.pentest-ground.com.
+Report Generated: 2025-09-20 17:42:54
+
+--- EXECUTION LOG ---
+=====================
+
+Step 1:
+----------
+  Action Command:
+    `nmap -sV www.pentest-ground.com`
+
+  Observation:
+    Starting Nmap 7.95 ( https://nmap.org ) at 2025-09-20 17:31 UTC
+    RTTVAR has grown to over 2.3 seconds, decreasing to 2.0
+    RTTVAR has grown to over 2.3 seconds, decreasing to 2.0
+    RTTVAR has grown to over 2.3 seconds, decreasing to 2.0
+    RTTVAR has grown to over 2.3 seconds, decreasing to 2.0
+    RTTVAR has grown to over 2.3 seconds, decreasing to 2.0
+    RTTVAR has grown to over 2.3 seconds, decreasing to 2.0
+    RTTVAR has grown to over 2.3 seconds, decreasing to 2.0
+    RTTVAR has grown to over 2.3 seconds, decreasing to 2.0
+    RTTVAR has grown to over 2.3 seconds, decreasing to 2.0
+    RTTVAR has grown to over 2.3 seconds, decreasing to 2.0
+    RTTVAR has grown to over 2.3 seconds, decreasing to 2.0
+    RTTVAR has grown to over 2.3 seconds, decreasing to 2.0
+    RTTVAR has grown to over 2.3 seconds, decreasing to 2.0
+    RTTVAR has grown to over 2.3 seconds, decreasing to 2.0
+    Nmap scan report for www.pentest-ground.com (178.79.155.238)
+    Host is up (0.68s latency).
+    rDNS record for 178.79.155.238: li274-238.members.linode.com
+    Not shown: 996 closed tcp ports (reset)
+    PORT     STATE SERVICE VERSION
+    21/tcp   open  ftp     vsftpd 3.0.3
+    80/tcp   open  http    Apache httpd 2.4.25 ((Debian))
+    4443/tcp open  ssh     OpenSSH 7.4p1 Debian 10+deb9u7 (protocol 2.0)
+    8080/tcp open  http    nginx 1.10.3
+    Service Info: OSs: Unix, Linux; CPE: cpe:/o:linux:linux_kernel
+    
+    Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+    Nmap done: 1 IP address (1 host up) scanned in 93.92 seconds
+    
+
+Step 2:
+----------
+  Action Command:
+    `finish_mission`
+
+  Observation:
+    The mission was to identify the web server running on www.pentest-ground.com. The execution history shows that an nmap scan was performed, which revealed the following open ports and services: 
+    - Port 21 (ftp) is open with vsftpd 3.0.3
+    - Port 80 (http) is open with Apache httpd 2.4.25 ((Debian))
+    - Port 4443 (ssh) is open with OpenSSH 7.4p1 Debian 10+deb9u7 (protocol 2.0)
+    - Port 8080 (http) is open with nginx 1.10.3
+    The web server running on www.pentest-ground.com is Apache httpd 2.4.25 ((Debian)) on port 80.
+
+--- FINAL SUMMARY ---
+=====================
+
+The mission was to identify the web server running on www.pentest-ground.com. The execution history shows that an nmap scan was performed, which revealed the following open ports and services: 
+- Port 21 (ftp) is open with vsftpd 3.0.3
+- Port 80 (http) is open with Apache httpd 2.4.25 ((Debian))
+- Port 4443 (ssh) is open with OpenSSH 7.4p1 Debian 10+deb9u7 (protocol 2.0)
+- Port 8080 (http) is open with nginx 1.10.3
+The web server running on www.pentest-ground.com is Apache httpd 2.4.25 ((Debian)) on port 80.
